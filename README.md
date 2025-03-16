@@ -38,7 +38,8 @@ In the **`example/`** folder, there is a simple **Flask API** demonstrating Lamp
 
 To run the example:
 ```sh
-pip install requirements.txt
+cd LamportJWT
+pip install -r example/requirements.txt
 python -m example.app
 ```
 
