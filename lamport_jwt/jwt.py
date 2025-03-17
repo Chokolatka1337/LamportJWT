@@ -6,12 +6,15 @@ from typing import List, Dict, Any, Optional, Tuple
 
 
 class InvalidKeyError(Exception):
+    pass
 
 
 class InvalidTokenError(Exception):
+    pass
 
 
 class SignatureVerificationError(Exception):
+    pass
 
 
 class LamportJWT:
