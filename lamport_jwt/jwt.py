@@ -8,19 +8,16 @@ from typing import List, Dict, Any, Optional, Tuple
 class InvalidKeyError(Exception):
     pass
 
-
 class InvalidTokenError(Exception):
     pass
-
 
 class SignatureVerificationError(Exception):
     pass
 
-
 class LamportJWT:
 
-    HASH_FUNC = hashlib.sha256
-    KEY_SIZE = 256
+    HASH_FUNC = hashlib.md5
+    KEY_SIZE = HASH_FUNC().digest_size * 8
     DEFAULT_KEY_FILE = "private_key.json"
 
     @staticmethod
@@ -32,19 +29,17 @@ class LamportJWT:
             if not (isinstance(pair, tuple) and len(pair) == 2):
                 raise InvalidKeyError("Each key entry must be a tuple of two elements.")
             if not (isinstance(pair[0], bytes) and isinstance(pair[1], bytes)):
-                raise InvalidKeyError("Each element of the key pair must be a 32-byte bytes object.")
-            if len(pair[0]) != 32 or len(pair[1]) != 32:
-                raise InvalidKeyError("Each value in the key pair must be 32 bytes long.")
+                raise InvalidKeyError("Each element of the key pair must be a bytes object.")
 
     @staticmethod
     def generate_private_key(filename: str = DEFAULT_KEY_FILE) -> None:
         private_key: List[Tuple[bytes, bytes]] = [
-            (secrets.token_bytes(32), secrets.token_bytes(32)) for _ in range(LamportJWT.KEY_SIZE)
+            (secrets.token_bytes(LamportJWT.KEY_SIZE//8), secrets.token_bytes(LamportJWT.KEY_SIZE//8)) for _ in range(LamportJWT.KEY_SIZE)
         ]
 
         with open(filename, "w") as f:
             json.dump(
-                [[base64.b64encode(k[0]).decode(), base64.b64encode(k[1]).decode()] for k in private_key],
+                [[base64.b85encode(k[0]).decode(), base64.b85encode(k[1]).decode()] for k in private_key],
                 f,
             )
 
@@ -53,7 +48,7 @@ class LamportJWT:
         with open(filename, "r") as f:
             key_data = json.load(f)
 
-        private_key = [(base64.b64decode(k[0]), base64.b64decode(k[1])) for k in key_data]
+        private_key = [(base64.b85decode(k[0]), base64.b85decode(k[1])) for k in key_data]
         LamportJWT._validate_private_key(private_key)
 
         return private_key
@@ -75,7 +70,7 @@ class LamportJWT:
         payload_hash_bits: str = ''.join(f'{byte:08b}' for byte in payload_hash)
 
         signature: List[str] = [
-            base64.b64encode(private_key[i][int(payload_hash_bits[i])]).decode()
+            base64.b85encode(private_key[i][int(payload_hash_bits[i])]).decode()
             for i in range(LamportJWT.KEY_SIZE)
         ]
 
@@ -83,16 +78,17 @@ class LamportJWT:
         jwt_data: Dict[str, Any] = {
             "header": header,
             "payload": payload,
-            "signature": signature,
+            "signature": signature
         }
 
-        return base64.b64encode(json.dumps(jwt_data, separators=(",", ":")).encode()).decode()
+        return base64.b85encode(json.dumps(jwt_data, separators=(",", ":")).encode()).decode()
 
     @staticmethod
     def decode(token: str, filename: str = DEFAULT_KEY_FILE) -> Dict[str, Any]:
 
         try:
-            jwt_data: Dict[str, Any] = json.loads(base64.b64decode(token).decode())
+            jwt_data: Dict[str, Any] = json.loads(base64.b85decode(token).decode())
+
         except (json.JSONDecodeError, ValueError):
             raise InvalidTokenError("Invalid JWT: Failed to decode JSON.")
 
@@ -114,7 +110,7 @@ class LamportJWT:
 
         for i in range(LamportJWT.KEY_SIZE):
             try:
-                signature_piece: bytes = base64.b64decode(jwt_data["signature"][i])
+                signature_piece: bytes = base64.b85decode(jwt_data["signature"][i])
             except ValueError:
                 raise InvalidTokenError("Invalid JWT: Signature contains invalid Base64 encoding.")
 
@@ -126,7 +122,7 @@ class LamportJWT:
     @staticmethod
     def decode_complete(token: str) -> Dict[str, Any]:
         try:
-            return json.loads(base64.b64decode(token).decode())
+            return json.loads(base64.b85decode(token).decode())
         except (json.JSONDecodeError, ValueError):
             raise InvalidTokenError("Invalid JWT: Failed to decode JSON.")
 
